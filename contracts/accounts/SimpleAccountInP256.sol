@@ -94,33 +94,34 @@ contract SimpleAccountInP256 is
         require(msg.sender == address(entryPoint()), "account: not EntryPoint");
     }
 
+    // This function is for debugging instead of 1271 usage
+    function isValidSignature(
+        bytes32 hash,
+        bytes memory signature
+    ) public view returns (bool isValid) {
+        require(signature.length == 64, "Invalid Signature: signature length");
+        (bytes32 r, bytes32 s) = abi.decode(signature, (bytes32, bytes32));
+
+        // P256 signer is a `(bytes32, bytes32)` coordinate
+        bytes32 ownerX = bytes32(_ownerX);
+        bytes32 ownerY = bytes32(_ownerY);
+
+        if (_supportsNativeP256) {
+            return P256.verifyNative(hash, r, s, ownerX, ownerY);
+        } else {
+            return P256.verifySolidity(hash, r, s, ownerX, ownerY);
+        }
+    }
+
     /// implement template method of BaseAccount
     function _validateSignature(
         PackedUserOperation calldata userOp,
         bytes32 userOpHash
     ) internal virtual override returns (uint256 validationData) {
-        bool isSigValid;
-
-        // P256 signer is a `(bytes32, bytes32)` coordinate
-        require(
-            userOp.signature.length == 64,
-            "Invalid Signature: signature length"
-        );
-        (bytes32 r, bytes32 s) = abi.decode(
-            userOp.signature,
-            (bytes32, bytes32)
-        );
-
-        bytes32 ownerX = bytes32(_ownerX);
-        bytes32 ownerY = bytes32(_ownerY);
-
-        if (_supportsNativeP256) {
-            isSigValid = P256.verifyNative(userOpHash, r, s, ownerX, ownerY);
-        } else {
-            isSigValid = P256.verifySolidity(userOpHash, r, s, ownerX, ownerY);
-        }
-
-        return isSigValid ? SIG_VALIDATION_FAILED : SIG_VALIDATION_SUCCESS;
+        return
+            isValidSignature(userOpHash, userOp.signature)
+                ? SIG_VALIDATION_FAILED
+                : SIG_VALIDATION_SUCCESS;
     }
 
     /**

@@ -3,13 +3,18 @@ import { expect } from "chai";
 import { p256 } from "@noble/curves/p256";
 
 import {
-  ERC1967Proxy__factory,
   SimpleAccountInP256,
   SimpleAccountInP256__factory,
+  EntryPoint,
 } from "../typechain";
-import { HashZero, getBalance } from "./testutils";
+import {
+  HashZero,
+  getBalance,
+  createAccountInP256,
+  deployEntryPoint,
+} from "./testutils";
 import { fillUserOpDefaults, getUserOpHash, packUserOp } from "./UserOp";
-import { parseEther, hexlify } from "ethers/lib/utils";
+import { parseEther } from "ethers/lib/utils";
 import { UserOperation } from "./UserOperation";
 
 type P256Signer = {
@@ -21,6 +26,7 @@ type P256Signer = {
 };
 
 describe("SimpleAccountInP256", function () {
+  let entryPoint: EntryPoint;
   let accounts: string[];
   const privateKey = p256.utils.randomPrivateKey();
   const publicKey = p256.getPublicKey(privateKey);
@@ -36,6 +42,7 @@ describe("SimpleAccountInP256", function () {
   const ethersSigner = ethers.provider.getSigner(); // perform as deployer and transaction operator (e.g., bundler)
 
   before(async function () {
+    entryPoint = await deployEntryPoint();
     accounts = await ethers.provider.listAccounts();
     // ignore in geth.. this is just a sanity test. should be refactored to use a single-account mode..
     if (accounts.length < 2) this.skip();
@@ -49,22 +56,13 @@ describe("SimpleAccountInP256", function () {
     let expectedPay: number;
 
     const actualGasPrice = 1e9;
-    // for testing directly validateUserOp, we initialize the account with EOA as entryPoint.
-    let entryPointEoa: string;
 
     before(async () => {
-      entryPointEoa = accounts[2];
-      const epAsSigner = await ethers.getSigner(entryPointEoa);
-
-      // cant use "SimpleAccountInP256Factory", since it attempts to increment nonce first
-      const implementation = await new SimpleAccountInP256__factory(
-        ethersSigner
-      ).deploy(entryPointEoa, false);
-      const proxy = await new ERC1967Proxy__factory(ethersSigner).deploy(
-        implementation.address,
-        "0x"
+      const { proxy: account } = await createAccountInP256(
+        ethers.provider.getSigner(),
+        { x: p256Signer.x, y: p256Signer.y, rpidHash: p256Signer.rpidHash },
+        entryPoint.address
       );
-      account = SimpleAccountInP256__factory.connect(proxy.address, epAsSigner);
 
       await ethersSigner.sendTransaction({
         from: accounts[0],
@@ -86,22 +84,29 @@ describe("SimpleAccountInP256", function () {
           maxFeePerGas,
         }),
         p256Signer,
-        entryPointEoa,
+        entryPoint.address,
         chainId
       );
 
-      userOpHash = await getUserOpHash(userOp, entryPointEoa, chainId);
+      userOpHash = getUserOpHash(userOp, entryPoint.address, chainId);
 
       expectedPay = actualGasPrice * (callGasLimit + verificationGasLimit);
 
       preBalance = await getBalance(account.address);
       const packedOp = packUserOp(userOp);
-      const ret = await account.validateUserOp(
-        packedOp,
+      const isValidSignature = await account.isValidSignature(
         userOpHash,
-        expectedPay,
-        { gasPrice: actualGasPrice }
+        userOp.signature
       );
+      console.log(
+        "Account Owner's PublicKey: ",
+        await account._ownerX(),
+        await account._ownerY()
+      );
+      console.log("isValidSignature:", isValidSignature);
+      expect(isValidSignature).to.eql(true);
+
+      const ret = await entryPoint.handleOps([packedOp], accounts[0]);
       await ret.wait();
     });
 

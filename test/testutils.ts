@@ -418,8 +418,8 @@ export async function createAccount(
 export async function createAccountInP256(
   ethersSigner: Signer,
   p256Signer: {
-    x: BigNumber;
-    y: BigNumber;
+    x: BigInt;
+    y: BigInt;
     rpidHash: BytesLike;
   },
   entryPoint: string,
@@ -430,6 +430,9 @@ export async function createAccountInP256(
   accountFactory: SimpleAccountInP256Factory;
   implementation: string;
 }> {
+  const x = BigNumber.from(p256Signer.x);
+  const y = BigNumber.from(p256Signer.y);
+
   const accountFactory =
     _factory ??
     (await new SimpleAccountInP256Factory__factory(ethersSigner).deploy(
@@ -449,10 +452,10 @@ export async function createAccountInP256(
   const senderCreatorSigner = await ethers.getImpersonatedSigner(senderCreator);
   await accountFactory
     .connect(senderCreatorSigner)
-    .createAccount(p256Signer.x, p256Signer.y, p256Signer.rpidHash, 0);
+    .createAccount(x, y, p256Signer.rpidHash, 0);
   const accountAddress = await accountFactory.getAddress(
-    p256Signer.x,
-    p256Signer.y,
+    x,
+    y,
     p256Signer.rpidHash,
     0
   );
