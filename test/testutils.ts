@@ -423,8 +423,8 @@ export async function createAccountInP256(
     rpidHash: BytesLike;
   },
   entryPoint: string,
-  _factory?: SimpleAccountInP256Factory,
-  _supportsNativeP256 = false
+  _supportsNativeP256 = false,
+  _factory?: SimpleAccountInP256Factory
 ): Promise<{
   proxy: SimpleAccountInP256;
   accountFactory: SimpleAccountInP256Factory;

@@ -29,7 +29,7 @@ contract SimpleAccountInP256 is
     uint256 public _ownerY;
     bytes32 public _authenticatorRPIDHash;
 
-    IEntryPoint private immutable _entryPoint;
+    IEntryPoint public immutable _entryPoint;
     bool public _supportsNativeP256;
 
     event SimpleAccountInitialized(
@@ -120,8 +120,8 @@ contract SimpleAccountInP256 is
     ) internal virtual override returns (uint256 validationData) {
         return
             isValidSignature(userOpHash, userOp.signature)
-                ? SIG_VALIDATION_FAILED
-                : SIG_VALIDATION_SUCCESS;
+                ? SIG_VALIDATION_SUCCESS
+                : SIG_VALIDATION_FAILED;
     }
 
     /**

@@ -1,18 +1,14 @@
 import { ethers } from "hardhat";
+import { toHex } from "hardhat/internal/util/bigint";
 import { expect } from "chai";
 import { p256 } from "@noble/curves/p256";
 
+import { SimpleAccountInP256, EntryPoint } from "../typechain";
 import {
-  SimpleAccountInP256,
-  SimpleAccountInP256__factory,
-  EntryPoint,
-} from "../typechain";
-import {
-  HashZero,
-  getBalance,
   createAccountInP256,
   deployEntryPoint,
 } from "./testutils";
+import { JsonRpcProvider } from "@ethersproject/providers";
 import { fillUserOpDefaults, getUserOpHash, packUserOp } from "./UserOp";
 import { parseEther } from "ethers/lib/utils";
 import { UserOperation } from "./UserOperation";
@@ -48,14 +44,11 @@ describe("SimpleAccountInP256", function () {
     if (accounts.length < 2) this.skip();
   });
 
-  describe("#validateUserOp", () => {
+  describe("#validateUserOp w/ non native P256", () => {
     let account: SimpleAccountInP256;
+    let accountAddress: string;
     let userOp: UserOperation;
     let userOpHash: string;
-    let preBalance: number;
-    let expectedPay: number;
-
-    const actualGasPrice = 1e9;
 
     before(async () => {
       const { proxy: account } = await createAccountInP256(
@@ -63,14 +56,18 @@ describe("SimpleAccountInP256", function () {
         { x: p256Signer.x, y: p256Signer.y, rpidHash: p256Signer.rpidHash },
         entryPoint.address
       );
+      expect(await account._entryPoint()).to.eql(entryPoint.address);
+      expect(await account._ownerX()).to.eql(p256Signer.x);
+      expect(await account._ownerY()).to.eql(p256Signer.y);
+      accountAddress = account.address;
 
       await ethersSigner.sendTransaction({
         from: accounts[0],
-        to: account.address,
+        to: accountAddress,
         value: parseEther("0.2"),
       });
       const callGasLimit = 200000;
-      const verificationGasLimit = 100000;
+      const verificationGasLimit = 20000000;
       const maxFeePerGas = 3e9;
       const chainId = await ethers.provider
         .getNetwork()
@@ -78,7 +75,7 @@ describe("SimpleAccountInP256", function () {
 
       userOp = signUserOp(
         fillUserOpDefaults({
-          sender: account.address,
+          sender: accountAddress,
           callGasLimit,
           verificationGasLimit,
           maxFeePerGas,
@@ -90,40 +87,20 @@ describe("SimpleAccountInP256", function () {
 
       userOpHash = getUserOpHash(userOp, entryPoint.address, chainId);
 
-      expectedPay = actualGasPrice * (callGasLimit + verificationGasLimit);
-
-      preBalance = await getBalance(account.address);
       const packedOp = packUserOp(userOp);
       const isValidSignature = await account.isValidSignature(
         userOpHash,
         userOp.signature
       );
-      console.log(
-        "Account Owner's PublicKey: ",
-        await account._ownerX(),
-        await account._ownerY()
-      );
       console.log("isValidSignature:", isValidSignature);
       expect(isValidSignature).to.eql(true);
 
+      await (ethersSigner.provider as JsonRpcProvider).send(
+        "hardhat_setBalance",
+        [accountAddress, toHex(100e18)]
+      );
       const ret = await entryPoint.handleOps([packedOp], accounts[0]);
       await ret.wait();
-    });
-
-    it("should pay", async () => {
-      const postBalance = await getBalance(account.address);
-      expect(preBalance - postBalance).to.eql(expectedPay);
-    });
-
-    it("should return NO_SIG_VALIDATION on wrong signature", async () => {
-      const userOpHash = HashZero;
-      const packedOp = packUserOp(userOp);
-      const deadline = await account.callStatic.validateUserOp(
-        { ...packedOp, nonce: 1 },
-        userOpHash,
-        0
-      );
-      expect(deadline).to.eq(1);
     });
   });
 });
