@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import "../interfaces/ISenderCreator.sol";
 import "./SimpleAccountInP256.sol";
 
 /**
@@ -15,14 +14,12 @@ import "./SimpleAccountInP256.sol";
  */
 contract SimpleAccountInP256Factory {
     SimpleAccountInP256 public immutable accountImplementation;
-    ISenderCreator public immutable senderCreator;
 
-    constructor(IEntryPoint _entryPoint, bool _supportsNativeP256) {
+    constructor(address _entryPoint, bool _supportsNativeP256) {
         accountImplementation = new SimpleAccountInP256(
-            _entryPoint,
+            IEntryPoint(_entryPoint),
             _supportsNativeP256
         );
-        senderCreator = _entryPoint.senderCreator();
     }
 
     /**
@@ -37,10 +34,6 @@ contract SimpleAccountInP256Factory {
         bytes32 authenticatorRPIDHash,
         uint256 salt
     ) public returns (SimpleAccountInP256 ret) {
-        require(
-            msg.sender == address(senderCreator),
-            "only callable from SenderCreator"
-        );
         address addr = getAddress(ownerX, ownerY, authenticatorRPIDHash, salt);
         uint256 codeSize = addr.code.length;
         if (codeSize > 0) {
