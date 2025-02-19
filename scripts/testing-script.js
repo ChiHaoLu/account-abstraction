@@ -198,28 +198,6 @@ async function main() {
   );
 
   // eth_estimateUserOperationGas
-  const bundlerUserOpWithoutNativeP256 = unpackUserOp(userOpWithoutNativeP256);
-  console.log(bundlerUserOpWithoutNativeP256);
-  await fetch(
-    `https://arb-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        id: 1,
-        jsonrpc: "2.0",
-        method: "eth_estimateUserOperationGas",
-        params: [bundlerUserOpWithoutNativeP256, EntryPointAddress],
-      }),
-    }
-  )
-    .then((res) => res.json())
-    .then((res) => console.log(res))
-    .catch((err) => console.error(err));
-
   const bundlerUserOpWithNativeP256 = unpackUserOp(userOpWithNativeP256);
   console.log(bundlerUserOpWithNativeP256);
   await fetch(
