@@ -30,13 +30,14 @@ contract SimpleAccountInP256 is
     bytes32 public _authenticatorRPIDHash;
 
     IEntryPoint public immutable _entryPoint;
-    bool public _supportsNativeP256;
+    bool public immutable _supportsNativeP256;
 
     event SimpleAccountInitialized(
         IEntryPoint indexed entryPoint,
         uint256 indexed ownerX,
         uint256 indexed ownerY,
-        bytes32 authenticatorRPIDHash
+        bytes32 authenticatorRPIDHash,
+        bool supportsNativeP256
     );
 
     modifier onlySelf() {
@@ -85,7 +86,8 @@ contract SimpleAccountInP256 is
             _entryPoint,
             ownerX,
             ownerY,
-            authenticatorRPIDHash
+            authenticatorRPIDHash,
+            _supportsNativeP256
         );
     }
 

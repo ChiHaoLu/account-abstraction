@@ -20,7 +20,13 @@ contract SimpleAccountInP256Factory {
             IEntryPoint(_entryPoint),
             _supportsNativeP256
         );
+        emit FactoryDeployed(_entryPoint, _supportsNativeP256);
     }
+
+    event FactoryDeployed(
+        address indexed entryPoint,
+        bool indexed supportsNativeP256
+    );
 
     /**
      * create an account, and return its address.
